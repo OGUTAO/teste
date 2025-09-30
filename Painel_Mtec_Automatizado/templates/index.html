@@ -25,7 +25,6 @@
         background-color: var(--bs-danger) !important; 
         box-shadow: 0 4px 15px -5px rgba(220, 53, 69, 0.6); 
     }
-    /* ========================================================== */
     
     .table-container { background-color: var(--dark-card); border-radius: 0.5rem; padding: 1rem; overflow-x: auto; }
     .table { --bs-table-bg: transparent; border-color: var(--dark-border); }
@@ -124,9 +123,15 @@
                     <div class="mb-3"> <label class="form-label">Imagem</label> <select id="addImagemId" class="form-select" required></select> </div>
                     <div class="mb-3"> <label class="form-label">Status</label> <select id="addStatusId" class="form-select" required></select> </div>
                     <hr>
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" role="switch" id="addUrgente">
-                        <label class="form-check-label" for="addUrgente">Pedido Urgente</label>
+                    <div class="d-flex justify-content-between">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" role="switch" id="addUrgente">
+                            <label class="form-check-label" for="addUrgente">Pedido Urgente</label>
+                        </div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" role="switch" id="addOffice">
+                            <label class="form-check-label" for="addOffice">Inclui Office</label>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button><button type="submit" class="btn btn-primary">Adicionar</button></div>
@@ -154,9 +159,15 @@
                             <div class="mb-3"> <label class="form-label">Imagem</label> <select id="editImagemId" class="form-select" required></select> </div>
                             <div class="mb-3"> <label class="form-label">Status</label> <select id="editStatusId" class="form-select" required></select> </div>
                             <hr>
-                            <div class="form-check form-switch">
-                               <input class="form-check-input" type="checkbox" role="switch" id="editUrgente">
-                               <label class="form-check-label" for="editUrgente">Pedido Urgente</label>
+                            <div class="d-flex justify-content-between">
+                                <div class="form-check form-switch">
+                                   <input class="form-check-input" type="checkbox" role="switch" id="editUrgente">
+                                   <label class="form-check-label" for="editUrgente">Pedido Urgente</label>
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" role="switch" id="editOffice">
+                                    <label class="form-check-label" for="editOffice">Inclui Office</label>
+                                 </div>
                             </div>
                         </div>
                     </div>
@@ -205,7 +216,7 @@
 <script>
     let listaStatus = [];
     let listaImagem = [];
-    let pedidosEmAndamentoCache = []; // Cache para guardar os pedidos
+    let pedidosEmAndamentoCache = [];
 
     function debounce(func, delay) {
         let timeout;
@@ -217,7 +228,7 @@
         const toast = document.createElement('div');
         toast.className = 'toast-notification';
         toast.style.cssText = "width: 350px; background-color: var(--dark-card); color: var(--light-text); border: 1px solid var(--dark-border); border-radius: 0.5rem; padding: 1rem; box-shadow: 0 8px 25px rgba(0,0,0,0.3); animation: slideIn 0.3s ease-out; overflow: hidden; position: relative;";
-        toast.innerHTML = `<div style="display: flex; justify-content: space-between; align-items-center;"><strong>${title}</strong><button type="button" class="btn-close" style="filter: invert(1);" aria-label="Close"></button></div><div style="font-size: 0.9rem; color: var(--secondary-text);">${message}</div><div class="toast-progress" style="position: absolute; bottom: 0; left: 0; height: 4px; background-color: var(--primary-accent); animation: progress 7s linear forwards;"></div>`;
+        toast.innerHTML = `<div style="display: flex; justify-content: space-between; align-items: center;"><strong>${title}</strong><button type="button" class="btn-close" style="filter: invert(1);" aria-label="Close"></button></div><div style="font-size: 0.9rem; color: var(--secondary-text);">${message}</div><div class="toast-progress" style="position: absolute; bottom: 0; left: 0; height: 4px; background-color: var(--primary-accent); animation: progress 7s linear forwards;"></div>`;
         container.appendChild(toast);
         const keyframes = `@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } } @keyframes slideOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(100%); opacity: 0; } } @keyframes progress { from { width: 100%; } to { width: 0%; } }`;
         const styleSheet = document.createElement("style");
@@ -287,12 +298,12 @@
             } else {
                 rowContent = `<td>${p.pv}${urgentIcon}</td><td>${p.equipamento}</td><td>${p.quantidade}</td><td><span class="badge ${badgeClass}">${p.status ?? 'N/A'}</span></td><td>${p.perfil_alteracao ?? 'N/A'}</td><td>${dataCriacao}</td><td>${dataFinalizacao}</td>`;
             }
-            tr.innerHTML = rowContent + `<td class="d-flex gap-2"><button class="btn btn-outline-warning btn-sm" onclick="editarPedido(${p.id}, '${p.pv}', '${p.equipamento}', ${p.quantidade}, '${p.descricao_servico}', ${p.imagem_id ?? 'null'}, ${statusId}, ${p.urgente}, ${p.prioridade})"><i class="fas fa-pencil-alt"></i></button><button class="btn btn-outline-danger btn-sm" onclick="deletarPedido(${p.id})"><i class="fas fa-trash"></i></button></td>`;
+            tr.innerHTML = rowContent + `<td class="d-flex gap-2"><button class="btn btn-outline-warning btn-sm" onclick="editarPedido(${p.id}, '${p.pv}', '${p.equipamento}', ${p.quantidade}, '${p.descricao_servico}', ${p.imagem_id ?? 'null'}, ${statusId}, ${p.urgente}, ${p.prioridade}, ${p.tem_office})"><i class="fas fa-pencil-alt"></i></button><button class="btn btn-outline-danger btn-sm" onclick="deletarPedido(${p.id})"><i class="fas fa-trash"></i></button></td>`;
             tbody.appendChild(tr);
         });
     }
     
-    async function editarPedido(id, pv, equipamento, quantidade, servico, imagemId, statusId, isUrgente, prioridade) {
+    async function editarPedido(id, pv, equipamento, quantidade, servico, imagemId, statusId, isUrgente, prioridade, hasOffice) {
         document.getElementById("editId").value = id;
         document.getElementById("editPv").value = pv;
         document.getElementById("editEquipamento").value = equipamento;
@@ -302,6 +313,7 @@
         document.getElementById("editStatusId").value = statusId;
         document.getElementById("editUrgente").checked = isUrgente;
         document.getElementById("editPrioridade").value = prioridade;
+        document.getElementById("editOffice").checked = hasOffice;
 
         const listaHistorico = document.getElementById("listaHistorico");
         listaHistorico.innerHTML = '<li>Carregando histórico...</li>';
@@ -379,7 +391,8 @@
             descricao_servico: document.getElementById("addServico").value,
             imagem_id: document.getElementById("addImagemId").value,
             status_id: document.getElementById("addStatusId").value,
-            urgente: document.getElementById("addUrgente").checked
+            urgente: document.getElementById("addUrgente").checked,
+            tem_office: document.getElementById("addOffice").checked
         };
         await fetch("/pedidos", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(formData) });
         bootstrap.Modal.getInstance(document.getElementById("adicionarModal")).hide();
@@ -401,7 +414,8 @@
             status_id: novoStatusId,
             imagem_id: document.getElementById("editImagemId").value,
             urgente: document.getElementById("editUrgente").checked,
-            prioridade: document.getElementById("editPrioridade").value
+            prioridade: document.getElementById("editPrioridade").value,
+            tem_office: document.getElementById("editOffice").checked
         };
         
         await fetch(`/pedidos/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(formData) });

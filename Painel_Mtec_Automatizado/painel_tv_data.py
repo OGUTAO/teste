@@ -24,7 +24,8 @@ def carregar_dados_completos():
         SELECT 
             p.id, p.status_id, p.equipamento, p.pv, p.descricao_servico,
             s.nome_status, p.data_criacao, p.quantidade, p.urgente,
-            p.data_conclusao, i.nome as nome_imagem, p.prioridade
+            p.data_conclusao, i.nome as nome_imagem, p.prioridade,
+            p.tem_office
         FROM 
             pedidos_tb p
         LEFT JOIN
@@ -46,6 +47,7 @@ def carregar_dados_completos():
         df['quantidade'] = pd.to_numeric(df['quantidade'], errors='coerce').fillna(0).astype(int)
         df['prioridade'] = pd.to_numeric(df['prioridade'], errors='coerce').fillna(9999).astype(int)
         df['urgente'].fillna(False, inplace=True)
+        df['tem_office'].fillna(False, inplace=True)
 
         # 2. Converte colunas de data, mantendo o tipo de data para cálculos
         df['data_criacao'] = pd.to_datetime(df['data_criacao'], errors='coerce', utc=True)
@@ -75,21 +77,15 @@ def get_painel_data():
         return dados_vazios
 
     try:
-        # Adicionado STATUS_ID_MONTAGEM
         STATUS_ID_CONCLUIDO = 4; STATUS_ID_CANCELADO = 6; STATUS_ID_PENDENTE = 5; STATUS_ID_BACKLOG = 2; STATUS_ID_AGUARDANDO = 1; STATUS_ID_MONTAGEM = 3
         
         hoje = datetime.now(FUSO_BRASILIA); inicio_do_dia = hoje.replace(hour=0, minute=0, second=0, microsecond=0)
         df_em_andamento = df_full[~df_full['status_id'].isin([STATUS_ID_CONCLUIDO, STATUS_ID_CANCELADO])]
         
         prioridades_df = df_em_andamento[~df_em_andamento['status_id'].isin([STATUS_ID_AGUARDANDO, STATUS_ID_PENDENTE])].head(4)
-        prioridades_ids = set(prioridades_df['id']) # Pega os IDs dos 4 prioritários
+        prioridades_ids = set(prioridades_df['id'])
 
-        # Lógica para a nova coluna
-        montagem_fora_df = df_em_andamento[
-            (df_em_andamento['status_id'] == STATUS_ID_MONTAGEM) &
-            (~df_em_andamento['id'].isin(prioridades_ids))
-        ]
-
+        montagem_fora_df = df_em_andamento[(df_em_andamento['status_id'] == STATUS_ID_MONTAGEM) & (~df_em_andamento['id'].isin(prioridades_ids))]
         backlog_df = df_em_andamento[df_em_andamento['status_id'] == STATUS_ID_BACKLOG]
         aguardando_df = df_em_andamento[df_em_andamento['status_id'] == STATUS_ID_AGUARDANDO]
         pendentes_df = df_em_andamento[df_em_andamento['status_id'] == STATUS_ID_PENDENTE]
@@ -99,7 +95,6 @@ def get_painel_data():
         concluidos_hoje_df = df_finalizados_hoje[df_finalizados_hoje['status_id'] == STATUS_ID_CONCLUIDO]
         cancelados_hoje_df = df_finalizados_hoje[df_finalizados_hoje['status_id'] == STATUS_ID_CANCELADO]
 
-        # Cálculos de Métricas
         inicio_mes_atual = hoje.replace(day=1, hour=0, minute=0, second=0)
         df_concluidos_mes_atual = df_com_data_final[(df_com_data_final['status_id'] == STATUS_ID_CONCLUIDO) & (df_com_data_final['data_conclusao'] >= inicio_mes_atual)]
         total_mes_pedidos = len(df_concluidos_mes_atual)
@@ -123,7 +118,6 @@ def get_painel_data():
             desempenho_semanal = df_concluidos_full.groupby('semana_inicio')['quantidade'].sum().tail(4)
             desempenho_semanal_list = [{"semana": k.strftime('%Y-%m-%d'), "valor": int(v)} for k, v in desempenho_semanal.items()]
 
-        # Preparação final dos dados para JSON
         dados = {
             "prioridades": to_safe_dict(prioridades_df),
             "backlog": {"lista": to_safe_dict(backlog_df.head(5)), "total": len(backlog_df)},

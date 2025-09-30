@@ -67,6 +67,7 @@ class PedidosTb(Base):
     prioridade = Column(Integer)
     perfil_alteracao = Column(String)
     urgente = Column(Boolean, default=False)
+    tem_office = Column(Boolean, default=False)
 
 class HistoricoStatusTb(Base):
     __tablename__ = 'historico_status_tb'
@@ -102,7 +103,6 @@ def popular_dados_iniciais(db_session):
 
 with app.app_context():
     print("Verificando e criando tabelas, se necessário...")
-    Base.metadata.create_all(engine)
     db_sess = SessionLocal()
     try:
         popular_dados_iniciais(db_sess)
@@ -127,7 +127,7 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-# --- Rotas ---
+# --- Rotas (o restante do arquivo permanece o mesmo) ---
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
@@ -140,6 +140,8 @@ def login():
                 session['logged_in'] = True
                 session['username'] = user.username
                 session['nivel_acesso'] = user.nivel_acesso
+                # --- LINHA ADICIONADA AQUI ---
+                flash("Você fez login com sucesso!", "success")
                 return redirect(url_for('home'))
             else:
                 flash("Credenciais inválidas.", "danger")
@@ -494,14 +496,15 @@ def add_pedido():
     username = session.get('username', 'Desconhecido')
     data_criacao = datetime.now(fuso_brasilia)
     urgente = data.get('urgente', False)
+    tem_office = data.get('tem_office', False)
 
     with engine.connect() as conn:
         with conn.begin():
             max_prioridade_result = conn.execute(text("SELECT COALESCE(MAX(prioridade), 0) FROM public.pedidos_tb")).scalar_one()
             nova_prioridade = max_prioridade_result + 1
             result = conn.execute(
-                text("""INSERT INTO public.pedidos_tb (pv, equipamento, quantidade, descricao_servico, status_id, imagem_id, perfil_alteracao, data_criacao, urgente, prioridade) VALUES (:pv, :equipamento, :quantidade, :descricao_servico, :status_id, :imagem_id, :perfil_alteracao, :data_criacao, :urgente, :prioridade) RETURNING id"""),
-                {"pv": data["pv"], "equipamento": data["equipamento"], "quantidade": data["quantidade"], "descricao_servico": data["descricao_servico"], "status_id": data["status_id"], "imagem_id": data["imagem_id"], "perfil_alteracao": username, "data_criacao": data_criacao, "urgente": urgente, "prioridade": nova_prioridade}
+                text("""INSERT INTO public.pedidos_tb (pv, equipamento, quantidade, descricao_servico, status_id, imagem_id, perfil_alteracao, data_criacao, urgente, prioridade, tem_office) VALUES (:pv, :equipamento, :quantidade, :descricao_servico, :status_id, :imagem_id, :perfil_alteracao, :data_criacao, :urgente, :prioridade, :tem_office) RETURNING id"""),
+                {"pv": data["pv"], "equipamento": data["equipamento"], "quantidade": data["quantidade"], "descricao_servico": data["descricao_servico"], "status_id": data["status_id"], "imagem_id": data["imagem_id"], "perfil_alteracao": username, "data_criacao": data_criacao, "urgente": urgente, "prioridade": nova_prioridade, "tem_office": tem_office}
             )
             novo_pedido_id = result.scalar_one()
             conn.execute(
@@ -542,10 +545,16 @@ def update_pedido(pedido_id):
 
             params = { "id": pedido_id, **data, "perfil_alteracao": username }
             
-            query_update_sql = "UPDATE public.pedidos_tb SET pv=:pv, equipamento=:equipamento, quantidade=:quantidade, descricao_servico=:descricao_servico, status_id=:status_id, imagem_id=:imagem_id, perfil_alteracao=:perfil_alteracao, urgente=:urgente, prioridade=:prioridade"
-            if novo_status_id in [4, 6] and status_anterior_id not in [4, 6]:
+            query_update_sql = "UPDATE public.pedidos_tb SET pv=:pv, equipamento=:equipamento, quantidade=:quantidade, descricao_servico=:descricao_servico, status_id=:status_id, imagem_id=:imagem_id, perfil_alteracao=:perfil_alteracao, urgente=:urgente, prioridade=:prioridade, tem_office=:tem_office"
+            
+            # --- LÓGICA CORRIGIDA E MELHORADA ---
+            # Se o novo status for Concluído (4) ou Cancelado (6), SEMPRE atualiza a data de conclusão para AGORA.
+            if novo_status_id in [4, 6]:
                 query_update_sql += ", data_conclusao = :data_conclusao"
                 params["data_conclusao"] = datetime.now(fuso_brasilia)
+            # Se o status ANTERIOR era Concluído ou Cancelado, mas o NOVO NÃO É, limpa a data de conclusão (define como NULL).
+            elif status_anterior_id in [4, 6] and novo_status_id not in [4, 6]:
+                query_update_sql += ", data_conclusao = NULL"
             
             query_update_sql += " WHERE id=:id"
             conn.execute(text(query_update_sql), params)
@@ -576,7 +585,7 @@ def get_historico_pedido(pedido_id):
         FROM public.historico_status_tb h
         LEFT JOIN public.status_td s_ant ON h.status_anterior = s_ant.id
         LEFT JOIN public.status_td s_alt ON h.status_alterado = s_alt.id
-        WHERE h.pedido_id = :pedido_id ORDER BY h.data_mudanca ASC
+        WHERE h.pedido_id = :pedido_id ORDER BY h.data_mudanca DESC
     """
     with engine.connect() as conn:
         result = conn.execute(text(query), {"pedido_id": pedido_id})

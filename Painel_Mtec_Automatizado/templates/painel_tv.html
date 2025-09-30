@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Painel de Produção MTEC</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
         :root {
             --bg-color: #1C1C1C;
@@ -15,6 +16,12 @@
             --text-secondary: #AAAAAA;
             --color-success: #2ECC71;
             --color-danger: #E74C3C;
+            --office-color: #2D89EF;
+            /* Cores para os ícones de SO */
+            --windows-color: #00A4EF;
+            --linux-color: #FCC624;
+            --slui-color: #F25022;
+            --freedos-color: #8C8C8C;
         }
         body {
             background-color: var(--bg-color);
@@ -60,7 +67,8 @@
         }
         .priority-card h3 { margin: 0; font-size: 1.1rem; }
         .priority-card p { margin: 5px 0; color: var(--text-secondary); font-size: 0.9rem; }
-        .card-footer { display: flex; justify-content: space-between; align-items: flex-end; }
+        .card-footer { display: flex; justify-content: space-between; align-items: center; }
+        .card-footer-info { display: flex; align-items: center; gap: 8px; } /* Reduzido o gap geral */
         .card-footer .maquinas { font-size: 1.8rem; font-weight: 700; }
         .list-item { font-size: 0.95rem; }
         .list-item .maquinas { color: var(--primary-orange); font-weight: 600; }
@@ -77,6 +85,42 @@
         .progress-bar { background-color: var(--card-bg); border-radius: 5px; height: 20px; overflow: hidden; }
         .progress-bar-fill { background-color: var(--primary-orange); height: 100%; width: 0%; transition: width 0.5s ease-in-out; }
         .progress-bar-container.current-week .progress-bar-fill { background-color: #FFAA33; }
+        
+        .office-indicator {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            color: var(--office-color);
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+        .office-indicator .fa-windows {
+            font-size: 1.1rem;
+        }
+
+        .os-icon-container {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            margin-right: 5px;
+        }
+        .os-icon {
+            font-size: 1.1rem;
+        }
+        .etq-icon {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            align-self: flex-start;
+        }
+        .windows-icon { color: var(--windows-color); }
+        .linux-icon { color: var(--linux-color); }
+        .slui-icon { color: var(--slui-color); }
+        .freedos-icon { color: var(--freedos-color); }
+
+        .info-separator {
+            color: var(--text-light);
+            font-weight: 600;
+        }
     </style>
 </head>
 <body>
@@ -86,7 +130,6 @@
             <h2 class="section-title">PRIORIDADES</h2>
             <div id="prioridades-container" class="grid-item"></div>
         </div>
-
         <div id="col-listas-1" class="grid-item">
             <div class="side-column-section">
                 <h2 class="section-title">BACKLOG</h2>
@@ -99,7 +142,6 @@
                 <p id="montagem-fora-more" class="list-more"></p>
             </div>
         </div>
-
         <div id="col-listas-2" class="grid-item">
             <div class="side-column-section">
                 <h2 class="section-title">AGUARDANDO CHEGADA</h2>
@@ -112,7 +154,6 @@
                 <p id="pendentes-more" class="list-more"></p>
             </div>
         </div>
-
         <div id="col-concluidos" class="grid-item">
             <div class="side-column-section">
                 <h2 class="section-title">ÚLTIMOS CONCLUÍDOS</h2>
@@ -125,9 +166,8 @@
                 <div class="totals-box" id="cancelados-total"></div>
             </div>
         </div>
-
         <div id="col-dashboard" class="grid-item">
-            <div class="dashboard-grid">
+             <div class="dashboard-grid">
                 <div class="metric-box">
                     <h4>Total Concluído no Mês</h4>
                     <p class="value" id="metric-total-mes">0</p>
@@ -152,6 +192,25 @@
 
     <script>
         const API_URL = '/api/painel-tv-dados';
+        
+        function getOsIcon(osName) {
+            if (!osName) return '';
+            const lowerOsName = osName.toLowerCase();
+            let iconHtml = '', etqHtml = '';
+            if (lowerOsName.includes('w11')) {
+                iconHtml = '<i class="fa-brands fa-windows os-icon windows-icon" title="Windows"></i>';
+                if (lowerOsName.includes('etq')) {
+                    etqHtml = '<i class="fa-solid fa-tag etq-icon" title="Ativação por Etiqueta"></i>';
+                }
+            } else if (lowerOsName.includes('linux')) {
+                iconHtml = '<i class="fa-brands fa-linux os-icon linux-icon" title="Linux"></i>';
+            } else if (lowerOsName.includes('slui')) {
+                iconHtml = '<i class="fa-solid fa-key os-icon slui-icon" title="SLUI - Solução de Problemas de Ativação"></i>';
+            } else if (lowerOsName.includes('freedos')) {
+                iconHtml = '<i class="fa-solid fa-circle-question os-icon freedos-icon" title="FreeDOS (Sem SO Windows)"></i>';
+            }
+            return `<div class="os-icon-container">${iconHtml}${etqHtml}</div>`;
+        }
 
         function renderPrioridades(prioridades) {
             const container = document.getElementById('prioridades-container');
@@ -161,6 +220,10 @@
             if (Array.isArray(prioridades) && prioridades.length > 0) {
                 prioridades.forEach(p => {
                     const prioridadeTexto = p.prioridade ? `(${p.prioridade}ª Prioridade)` : '';
+                    // ===== LÓGICA ATUALIZADA PARA ADICIONAR O TRAÇO =====
+                    const officeIndicator = p.tem_office ? `<span class="info-separator">-</span><span class="office-indicator" title="Inclui Office"><i class="fa-brands fa-windows"></i> Office</span>` : '';
+                    const osIcon = getOsIcon(p.nome_imagem);
+
                     const card = `
                         <div class="priority-card">
                             <div>
@@ -170,7 +233,10 @@
                                 <p><b>Serviço:</b> ${p.descricao_servico || 'N/A'}</p>
                             </div>
                             <div class="card-footer">
-                                <p><b>Imagem:</b> ${p.nome_imagem || 'N/A'}</p>
+                                <div class="card-footer-info">
+                                    <span><b>Imagem:</b> ${osIcon} ${p.nome_imagem || 'N/A'}</span>
+                                    ${officeIndicator}
+                                </div>
                                 <span class="maquinas">${p.quantidade || 0} máq.</span>
                             </div>
                         </div>
@@ -182,6 +248,7 @@
             }
         }
 
+        // As outras funções JavaScript não precisam de alteração
         function renderSimpleList(data, listId, moreId) {
             const listContainer = document.getElementById(listId);
             const moreContainer = document.getElementById(moreId);
@@ -299,7 +366,7 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             atualizarPainel();
-            setInterval(atualizarPainel, 10000); // atualiza a cada 10 segundos
+            setInterval(atualizarPainel, 10000);
         });
     </script>
 </body>
