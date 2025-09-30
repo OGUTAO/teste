@@ -132,7 +132,7 @@
         </div>
         <div id="col-listas-1" class="grid-item">
             <div class="side-column-section">
-                <h2 class="section-title">BACKLOG</h2>
+                <h2 class="section-title">AGUARDANDO MONTAGEM</h2>
                 <div id="backlog-list"></div>
                 <p id="backlog-more" class="list-more"></p>
             </div>
@@ -223,11 +223,12 @@
                     // ===== LÓGICA ATUALIZADA PARA ADICIONAR O TRAÇO =====
                     const officeIndicator = p.tem_office ? `<span class="info-separator">-</span><span class="office-indicator" title="Inclui Office"><i class="fa-brands fa-windows"></i> Office</span>` : '';
                     const osIcon = getOsIcon(p.nome_imagem);
+                    const urgentIcon = p.urgente ? `<i class="fa-solid fa-fire" style="color: var(--color-danger);" title="Urgente"></i>` : '';
 
                     const card = `
                         <div class="priority-card">
                             <div>
-                                <h3>PV: ${p.pv} ${prioridadeTexto}</h3>
+                                <h3>${urgentIcon} PV: ${p.pv} ${prioridadeTexto}</h3>
                                 <p><b>Status:</b> ${p.nome_status || 'N/A'}</p>
                                 <p><b>Equipamento:</b> ${p.equipamento || 'N/A'}</p>
                                 <p><b>Serviço:</b> ${p.descricao_servico || 'N/A'}</p>

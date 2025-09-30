@@ -392,7 +392,7 @@ def gerar_relatorio_api():
         start_date = datetime.strptime(start_date_str, '%Y-%m-%d').replace(hour=0, minute=0, second=0, tzinfo=fuso_brasilia)
         end_date = datetime.strptime(end_date_str, '%Y-%m-%d').replace(hour=23, minute=59, second=59, tzinfo=fuso_brasilia)
         
-        # Query para atividades finalizadas (Concluídas e Canceladas) no período
+        # Query 1: Busca pedidos FINALIZADOS (concluídos/cancelados) DENTRO DO PERÍODO
         query_finalizadas = text("""
             SELECT
                 s.nome_status as status,
@@ -406,7 +406,7 @@ def gerar_relatorio_api():
             GROUP BY status, tipo;
         """)
         
-        # Query para o estado atual dos pedidos em aberto, agrupando Backlog e Em Montagem
+        # Query 2: Busca o ESTADO ATUAL dos pedidos em aberto (sem filtro de data)
         query_atuais = text("""
             SELECT
                 CASE 
@@ -425,6 +425,7 @@ def gerar_relatorio_api():
         result_finalizadas = db_session.execute(query_finalizadas, {"start_date": start_date, "end_date": end_date}).mappings().all()
         result_atuais = db_session.execute(query_atuais).mappings().all()
 
+        # Estrutura de dados para armazenar os totais
         dados = {
             'realizadas': {'PV': None, 'OP': None},
             'canceladas': {'PV': None, 'OP': None},
@@ -432,6 +433,7 @@ def gerar_relatorio_api():
             'pendentes': {'PV': None, 'OP': None}
         }
 
+        # Processa os resultados
         for row in result_finalizadas:
             categoria = 'realizadas' if row['status'] == 'Concluído' else 'canceladas'
             dados[categoria][row['tipo']] = {'pedidos': row['total_pedidos'], 'unidades': row['total_unidades']}
@@ -442,7 +444,7 @@ def gerar_relatorio_api():
             elif row['status_agrupado'] == 'Pendente':
                 dados['pendentes'][row['tipo']] = {'pedidos': row['total_pedidos'], 'unidades': row['total_unidades']}
         
-        # Função auxiliar para construir seções do relatório
+        # Função auxiliar para formatar cada seção do relatório
         def construir_secao(titulo, dados_secao):
             texto = f"<strong><u>{titulo}:</u></strong>\n"
             if not dados_secao['PV'] and not dados_secao['OP']:
@@ -453,27 +455,22 @@ def gerar_relatorio_api():
                 texto += f"    • {dados_secao['OP']['pedidos']} OP com {dados_secao['OP']['unidades']} unidades de Teravix\n"
             return texto
 
-        # Monta o texto final do relatório
+        # Monta o texto final, adicionando seções apenas se tiverem conteúdo
         data_formatada = end_date.strftime('%d/%m/%Y')
         if start_date_str != end_date_str:
             data_formatada = f"{start_date.strftime('%d/%m/%Y')} a {data_formatada}"
 
-        partes_relatorio = []
-        partes_relatorio.append(f"Relatório de Atividades - <u>{data_formatada}</u>")
-        partes_relatorio.append("=" * 40)
+        partes_relatorio = [f"Relatório de Atividades - <u>{data_formatada}</u>", "=" * 40]
         
         partes_relatorio.append(construir_secao("Atividades Realizadas", dados['realizadas']))
-
-        partes_relatorio.append(construir_secao("Backlog", dados['backlog']))
-
-          
-        if dados['pendentes']['PV'] or dados['pendentes']['OP']:
-            partes_relatorio.append(construir_secao("Pendentes", dados['pendentes']))
-    
-
+        
         if dados['canceladas']['PV'] or dados['canceladas']['OP']:
             partes_relatorio.append(construir_secao("Atividades Canceladas", dados['canceladas']))
+        
+        if dados['pendentes']['PV'] or dados['pendentes']['OP']:
+            partes_relatorio.append(construir_secao("Pendentes", dados['pendentes']))
 
+        partes_relatorio.append(construir_secao("Backlog (Inclui Em Montagem)", dados['backlog']))
 
         relatorio_texto = "\n".join(partes_relatorio)
 
