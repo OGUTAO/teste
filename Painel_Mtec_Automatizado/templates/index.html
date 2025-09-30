@@ -275,7 +275,7 @@
         pedidos.forEach(p => {
             const statusId = p.status_id ?? 'null';
             const dataCriacao = p.data_criacao ? new Date(p.data_criacao).toLocaleString('pt-BR') : 'N/A';
-            const dataFinalizacao = p.data_finalizacao ? new Date(p.data_finalizacao).toLocaleString('pt-BR') : 'N/A';
+            const dataFinalizacao = p.data_conclusao ? new Date(p.data_conclusao).toLocaleString('pt-BR') : 'N/A';
             let badgeClass = 'bg-dark';
             switch (statusId) {
                 case 1: badgeClass = 'bg-secondary'; break;
