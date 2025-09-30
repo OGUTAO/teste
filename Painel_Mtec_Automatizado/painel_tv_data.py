@@ -31,12 +31,15 @@ def carregar_dados_completos():
         LEFT JOIN
             status_td s ON p.status_id = s.id
         LEFT JOIN                               
-            imagem_td i ON p.imagem_id = i.id;
+            imagem_td i ON p.imagem_id = i.id
+        ORDER BY
+            p.urgente DESC, p.prioridade ASC;
     """
     try:
         df = pd.read_sql(query, engine)
         if df.empty:
             return pd.DataFrame()
+
 
         # 1. Limpeza de dados não-data
         df['nome_status'].fillna('Não Definido', inplace=True)

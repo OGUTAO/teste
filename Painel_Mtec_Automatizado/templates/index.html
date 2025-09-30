@@ -4,19 +4,16 @@
 
 {% block head_styles %}
 <style>
-    /* Estilos específicos desta página */
     .panel-header { border-bottom: 1px solid var(--dark-border); padding-bottom: 1.5rem; margin-bottom: 1.5rem; }
     .panel-header h1 { font-weight: 600; }
     .search-bar { background-color: var(--dark-card); padding: 1rem; border-radius: 0.5rem; margin-bottom: 1.5rem; }
     .form-label { margin-bottom: 0.5rem; font-size: 0.875rem; color: var(--secondary-text); font-weight: 500; }
     .nav-pills .nav-link { color: var(--secondary-text); font-weight: 500; }
-    
     .nav-pills .nav-link.active, .nav-pills .show>.nav-link { 
         background-color: var(--primary-accent); 
         color: white; 
         box-shadow: 0 4px 15px -5px rgba(255, 102, 0, 0.6);
     }
-
     #pills-concluidos-tab.active { 
         background-color: var(--bs-success) !important; 
         box-shadow: 0 4px 15px -5px rgba(25, 135, 84, 0.6); 
@@ -25,7 +22,6 @@
         background-color: var(--bs-danger) !important; 
         box-shadow: 0 4px 15px -5px rgba(220, 53, 69, 0.6); 
     }
-    
     .table-container { background-color: var(--dark-card); border-radius: 0.5rem; padding: 1rem; overflow-x: auto; }
     .table { --bs-table-bg: transparent; border-color: var(--dark-border); }
     .table thead th { background-color: #454545;; color: var(--light-text); font-weight: 600; border-bottom: 2px solid var(--primary-accent); }
@@ -89,7 +85,7 @@
             <table class="table table-hover">
                 <thead>
                     <tr>
-                        <th>OP/PV</th> <th>Equipamento</th> <th>Qtd.</th> <th>Status</th> <th>Criado por</th> <th>Data Criação</th><th>Data de Conclusão</th> <th>Ações</th>
+                        <th>OP/PV</th> <th>Equipamento</th> <th>Qtd.</th> <th>Status</th> <th>Concluído por</th> <th>Data Criação</th><th>Data de Conclusão</th> <th>Ações</th>
                     </tr>
                 </thead>
                 <tbody id="tabelaPedidosConcluidos"></tbody>
@@ -101,7 +97,7 @@
             <table class="table table-hover">
                 <thead>
                     <tr>
-                        <th>OP/PV</th> <th>Equipamento</th> <th>Qtd.</th> <th>Status</th> <th>Criado por</th> <th>Data Criação</th><th>Data de Cancelamento</th> <th>Ações</th>
+                        <th>OP/PV</th> <th>Equipamento</th> <th>Qtd.</th> <th>Status</th> <th>Cancelado por</th> <th>Data Criação</th><th>Data de Cancelamento</th> <th>Ações</th>
                     </tr>
                 </thead>
                 <tbody id="tabelaPedidosCancelados"></tbody>
@@ -211,7 +207,6 @@
 </div>
 {% endblock %}
 
-
 {% block scripts %}
 <script>
     let listaStatus = [];
@@ -293,10 +288,13 @@
             const urgentIcon = p.urgente ? '<i class="fas fa-fire text-danger ms-2"></i>' : '';
             let tr = document.createElement("tr");
             let rowContent = '';
+            
             if (tipoFiltro === 'andamento') {
-                rowContent = `<td>${p.pv}${urgentIcon}</td><td>${p.equipamento}</td><td>${p.quantidade}</td><td>${p.descricao_servico}</td><td>${p.imagem_nome ?? 'N/A'}</td><td><span class="badge ${badgeClass}">${p.status ?? 'N/A'}</span></td><td>${p.perfil_alteracao ?? 'N/A'}</td><td>${dataCriacao}</td>`;
+                const criadoPor = p.criado_por || 'N/A';
+                rowContent = `<td>${p.pv}${urgentIcon}</td><td>${p.equipamento}</td><td>${p.quantidade}</td><td>${p.descricao_servico}</td><td>${p.imagem_nome ?? 'N/A'}</td><td><span class="badge ${badgeClass}">${p.status ?? 'N/A'}</span></td><td>${criadoPor}</td><td>${dataCriacao}</td>`;
             } else {
-                rowContent = `<td>${p.pv}${urgentIcon}</td><td>${p.equipamento}</td><td>${p.quantidade}</td><td><span class="badge ${badgeClass}">${p.status ?? 'N/A'}</span></td><td>${p.perfil_alteracao ?? 'N/A'}</td><td>${dataCriacao}</td><td>${dataFinalizacao}</td>`;
+                const finalizadoPor = p.perfil_alteracao || 'N/A';
+                rowContent = `<td>${p.pv}${urgentIcon}</td><td>${p.equipamento}</td><td>${p.quantidade}</td><td><span class="badge ${badgeClass}">${p.status ?? 'N/A'}</span></td><td>${finalizadoPor}</td><td>${dataCriacao}</td><td>${dataFinalizacao}</td>`;
             }
             tr.innerHTML = rowContent + `<td class="d-flex gap-2"><button class="btn btn-outline-warning btn-sm" onclick="editarPedido(${p.id}, '${p.pv}', '${p.equipamento}', ${p.quantidade}, '${p.descricao_servico}', ${p.imagem_id ?? 'null'}, ${statusId}, ${p.urgente}, ${p.prioridade}, ${p.tem_office})"><i class="fas fa-pencil-alt"></i></button><button class="btn btn-outline-danger btn-sm" onclick="deletarPedido(${p.id})"><i class="fas fa-trash"></i></button></td>`;
             tbody.appendChild(tr);

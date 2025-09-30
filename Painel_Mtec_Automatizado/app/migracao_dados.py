@@ -14,7 +14,6 @@ def get_db_connection():
 
     if database_url:
         print("Conectando via DATABASE_URL (ambiente Docker)...")
-        # Ajusta a URL para o formato que o psycopg2 espera
         conn_str = database_url.replace("postgresql://", "postgres://")
         return psycopg2.connect(conn_str)
     else:
@@ -36,7 +35,8 @@ def migrar_dados_pedidos():
         cur = conn.cursor()
 
         print("Limpando registros antigos importados da planilha...")
-        cur.execute("DELETE FROM public.pedidos_tb WHERE perfil_alteracao = 'Importada Planilha';")
+        # Limpa apenas os que foram importados anteriormente para não apagar os criados manualmente
+        cur.execute("DELETE FROM public.pedidos_tb WHERE criado_por = 'Importada Planilha';")
 
         status_aguardando_chegada = "Aguardando Chegada"
         print(f"Buscando o ID para o status: '{status_aguardando_chegada}'...")
@@ -67,24 +67,25 @@ def migrar_dados_pedidos():
             "qtd_maquinas": "quantidade"
         })
 
-        df_excel['prioridade'] = range(1, len(df_excel) + 1)
+        # Define a prioridade inicial baseada na ordem da planilha
+        cur.execute("SELECT COALESCE(MAX(prioridade), 0) FROM public.pedidos_tb")
+        max_prioridade_existente = cur.fetchone()[0]
+        df_excel['prioridade'] = range(max_prioridade_existente + 1, len(df_excel) + max_prioridade_existente + 1)
         
         print("Inserindo novos dados na tabela pedidos_tb...")
         pedidos_processados = 0
         for index, row in df_excel.iterrows():
-            # Se 'codigo_pedido' for vazio (NaN no pandas), converte para None (NULL no SQL)
             codigo_pedido = row.get('codigo_pedido')
             if pd.isna(codigo_pedido):
                 codigo_pedido = None
 
             data_criacao = datetime.now()
-            perfil_altecao = "Importada Planilha"
+            criado_por_val = "Importada Planilha"
             status_urgente = False
 
-            # Query sem a cláusula ON CONFLICT para permitir múltiplos nulos
             query = """
-            INSERT INTO public.pedidos_tb (codigo_pedido, equipamento, pv, descricao_servico, status_id, data_criacao, quantidade, prioridade, perfil_alteracao, urgente)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+            INSERT INTO public.pedidos_tb (codigo_pedido, equipamento, pv, descricao_servico, status_id, data_criacao, quantidade, prioridade, perfil_alteracao, urgente, criado_por)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
             """
             cur.execute(query, (
                 codigo_pedido, 
@@ -95,8 +96,9 @@ def migrar_dados_pedidos():
                 data_criacao,
                 row.get('quantidade'), 
                 row.get('prioridade'), 
-                perfil_altecao,
-                status_urgente
+                criado_por_val, # perfil_alteracao também recebe o valor inicial
+                status_urgente,
+                criado_por_val  # criado_por recebe o valor inicial
             ))
             pedidos_processados += 1
 
@@ -105,7 +107,6 @@ def migrar_dados_pedidos():
 
     except psycopg2.Error as e:
         print(f"Erro no banco de dados: {e}")
-        print("Isso pode ter ocorrido se houver valores duplicados na coluna 'pedido' do seu arquivo Excel.")
         if conn:
             conn.rollback()
     except FileNotFoundError:
