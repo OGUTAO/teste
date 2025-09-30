@@ -7,7 +7,6 @@ from functools import wraps
 import os
 from datetime import datetime
 import pytz
-# Adicionado para hash de senha
 from werkzeug.security import generate_password_hash, check_password_hash
 
 # Definir fuso horário de Brasília

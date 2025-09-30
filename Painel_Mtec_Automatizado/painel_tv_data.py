@@ -69,15 +69,31 @@ def get_painel_data():
     """Função principal que busca e organiza todos os dados para a API do painel."""
     df_full = carregar_dados_completos()
     
-    dados_vazios = { "prioridades": [], "backlog": {"lista": [], "total": 0}, "aguardando": {"lista": [], "total": 0}, "pendentes": {"lista": [], "total": 0}, "concluidos_hoje": {"lista": [], "total_pedidos": 0, "total_maquinas": 0}, "cancelados_hoje": {"lista": [], "total_pedidos": 0, "total_maquinas": 0}, "metricas": { "total_mes_pedidos": 0, "total_mes_maquinas": 0, "media_diaria_pedidos": 0.0, "media_diaria_maquinas": 0.0, "recorde_dia_data": "N/A", "recorde_dia_pedidos": 0, "recorde_dia_maquinas": 0 }, "desempenho_semanal": [], "meta_semanal": META_SEMANAL }
+    dados_vazios = { "prioridades": [], "backlog": {"lista": [], "total": 0}, "aguardando": {"lista": [], "total": 0}, "pendentes": {"lista": [], "total": 0}, "em_montagem_fora_prioridade": {"lista": [], "total": 0}, "concluidos_hoje": {"lista": [], "total_pedidos": 0, "total_maquinas": 0}, "cancelados_hoje": {"lista": [], "total_pedidos": 0, "total_maquinas": 0}, "metricas": { "total_mes_pedidos": 0, "total_mes_maquinas": 0, "media_diaria_pedidos": 0.0, "media_diaria_maquinas": 0.0, "recorde_dia_data": "N/A", "recorde_dia_pedidos": 0, "recorde_dia_maquinas": 0 }, "desempenho_semanal": [], "meta_semanal": META_SEMANAL }
 
     if df_full.empty:
         return dados_vazios
 
     try:
-        STATUS_ID_CONCLUIDO = 4; STATUS_ID_CANCELADO = 6; STATUS_ID_PENDENTE = 5; STATUS_ID_BACKLOG = 2; STATUS_ID_AGUARDANDO = 1
+        # Adicionado STATUS_ID_MONTAGEM
+        STATUS_ID_CONCLUIDO = 4; STATUS_ID_CANCELADO = 6; STATUS_ID_PENDENTE = 5; STATUS_ID_BACKLOG = 2; STATUS_ID_AGUARDANDO = 1; STATUS_ID_MONTAGEM = 3
+        
         hoje = datetime.now(FUSO_BRASILIA); inicio_do_dia = hoje.replace(hour=0, minute=0, second=0, microsecond=0)
         df_em_andamento = df_full[~df_full['status_id'].isin([STATUS_ID_CONCLUIDO, STATUS_ID_CANCELADO])]
+        
+        prioridades_df = df_em_andamento[~df_em_andamento['status_id'].isin([STATUS_ID_AGUARDANDO, STATUS_ID_PENDENTE])].head(4)
+        prioridades_ids = set(prioridades_df['id']) # Pega os IDs dos 4 prioritários
+
+        # Lógica para a nova coluna
+        montagem_fora_df = df_em_andamento[
+            (df_em_andamento['status_id'] == STATUS_ID_MONTAGEM) &
+            (~df_em_andamento['id'].isin(prioridades_ids))
+        ]
+
+        backlog_df = df_em_andamento[df_em_andamento['status_id'] == STATUS_ID_BACKLOG]
+        aguardando_df = df_em_andamento[df_em_andamento['status_id'] == STATUS_ID_AGUARDANDO]
+        pendentes_df = df_em_andamento[df_em_andamento['status_id'] == STATUS_ID_PENDENTE]
+        
         df_com_data_final = df_full.dropna(subset=['data_conclusao'])
         df_finalizados_hoje = df_com_data_final[df_com_data_final['data_conclusao'] >= inicio_do_dia]
         concluidos_hoje_df = df_finalizados_hoje[df_finalizados_hoje['status_id'] == STATUS_ID_CONCLUIDO]
@@ -105,14 +121,15 @@ def get_painel_data():
         if not df_concluidos_full.empty:
             df_concluidos_full['semana_inicio'] = df_concluidos_full['data_conclusao'].dt.tz_localize(None).dt.to_period('W-MON').apply(lambda p: p.start_time.date())
             desempenho_semanal = df_concluidos_full.groupby('semana_inicio')['quantidade'].sum().tail(4)
-        # LINHA NOVA E CORRIGIDA
-        desempenho_semanal_list = [{"semana": k.strftime('%Y-%m-%d'), "valor": int(v)} for k, v in desempenho_semanal.items()]
+            desempenho_semanal_list = [{"semana": k.strftime('%Y-%m-%d'), "valor": int(v)} for k, v in desempenho_semanal.items()]
+
         # Preparação final dos dados para JSON
         dados = {
-            "prioridades": to_safe_dict(df_em_andamento[~df_em_andamento['status_id'].isin([STATUS_ID_AGUARDANDO, STATUS_ID_PENDENTE])].head(4)),
-            "backlog": {"lista": to_safe_dict(df_em_andamento[df_em_andamento['status_id'] == STATUS_ID_BACKLOG].head(5)), "total": len(df_em_andamento[df_em_andamento['status_id'] == STATUS_ID_BACKLOG])},
-            "aguardando": {"lista": to_safe_dict(df_em_andamento[df_em_andamento['status_id'] == STATUS_ID_AGUARDANDO].head(5)), "total": len(df_em_andamento[df_em_andamento['status_id'] == STATUS_ID_AGUARDANDO])},
-            "pendentes": {"lista": to_safe_dict(df_em_andamento[df_em_andamento['status_id'] == STATUS_ID_PENDENTE].head(5)), "total": len(df_em_andamento[df_em_andamento['status_id'] == STATUS_ID_PENDENTE])},
+            "prioridades": to_safe_dict(prioridades_df),
+            "backlog": {"lista": to_safe_dict(backlog_df.head(5)), "total": len(backlog_df)},
+            "aguardando": {"lista": to_safe_dict(aguardando_df.head(5)), "total": len(aguardando_df)},
+            "pendentes": {"lista": to_safe_dict(pendentes_df.head(5)), "total": len(pendentes_df)},
+            "em_montagem_fora_prioridade": {"lista": to_safe_dict(montagem_fora_df.head(5)), "total": len(montagem_fora_df)},
             "concluidos_hoje": {"lista": to_safe_dict(concluidos_hoje_df), "total_pedidos": len(concluidos_hoje_df), "total_maquinas": int(concluidos_hoje_df['quantidade'].sum())},
             "cancelados_hoje": {"lista": to_safe_dict(cancelados_hoje_df), "total_pedidos": len(cancelados_hoje_df), "total_maquinas": int(cancelados_hoje_df['quantidade'].sum())},
             "metricas": { "total_mes_pedidos": total_mes_pedidos, "total_mes_maquinas": total_mes_maquinas, "media_diaria_pedidos": round(media_diaria_pedidos, 1), "media_diaria_maquinas": round(media_diaria_maquinas, 1), "recorde_dia_data": recorde_dia_data, "recorde_dia_pedidos": recorde_dia_pedidos, "recorde_dia_maquinas": recorde_dia_maquinas },
